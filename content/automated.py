@@ -51,7 +51,6 @@ def tenor_tags(link):
     if match is None:
         return 'Error fetching Tenor API'
     req = session.get(
-                            #url=f"https://tenor.com/view/cat-gif-13804884270647922491",
                             url=f"https://tenor.googleapis.com/v2/posts?ids={match.group(0)}&key={API_KEY}&limit={1}media_filter=minimal", 
                             headers={'User-Agent': 'Mozilla/5.0'}
                         )
@@ -151,11 +150,6 @@ def format_json(entries = -1, use_multi_turn = True, additive_dataset = False, o
 
     pings = defaultdict(int)
 
-    
-
-    
-    
-        
     def single_turn(f):
 
         successful_conversions = 0
@@ -332,12 +326,6 @@ def sanitize(message, emoticon_pattern, pings):
 
     message['response'] = message['response'].replace('`','')
 
-    message['response'] = message['response'].replace('nigga','brotha')
-    message['response'] = message['response'].replace('retarded','brain dead')
-    message['response'] = message['response'].replace('retard','dumbass')
-    message['response'] = message['response'].replace('faggot','bitch')
-
-
     if any(sub in message['response'].lower() for sub in ['youtu.be', 'https://', '.com', 'services.flhsmv.gov', 'itch.io', 'www.twitch.tv', 'media.discordapp.net', 'www.vintagestory.at']) :
         return (message['response'], "Message contains link")
 
@@ -374,7 +362,7 @@ def sanitize(message, emoticon_pattern, pings):
         message['response'] = message['response'][:match.start()] + message['response'][match.end():]
 
     while match := re.search(r'%[A-Z0-9]', message['response']): #a-z
-        return (message['response'], "Message contains hexidecimal") #message['response'] = message['response'][:match.start()] + message['response'][match.end():]
+        return (message['response'], "Message contains hexidecimal")
 
     message['response'] = message['response'].replace('%','') # has to be after hexidecimal matching to cleanup
 
@@ -410,7 +398,6 @@ def pattern_match(message, pings = None):
         if not match:
             break
 
-        #ping = message[match.start()+2:match.end()-1]
         message_pre = message[:match.start()]
         id_to_username = discord_association.get(message[match.start()+2:match.end()-1], '')
         id_to_username = (message[match.start()+2:match.end()-1]) if id_to_username == '' else id_to_username

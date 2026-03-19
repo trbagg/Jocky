@@ -105,7 +105,7 @@ def ping_match(ping, discord_association):
 			best_val = val
 			chosen = discord_association.get(ping)
 
-	return f"<@{chosen if chosen is not None else f'(A ping error happened when attempting to ping: {ping} as {chosen})'}>" #f"<ping:@{association.get(chosen, "Key not found")}>"
+	return f"<@{chosen if chosen is not None else f'(A ping error happened when attempting to ping: {ping} as {chosen})'}>"
 
 def unsanitize(response):
 	match = True
