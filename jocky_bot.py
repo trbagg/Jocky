@@ -87,9 +87,6 @@ def giphy_match(url):
 
 	gifs = giphy_lookup(url[1:min(30,len(url))], lmt)
 	if(type(gifs) == dict and len(gifs['data']) > 0):
-		ret = gifs['data']
-		ret = ret[0]
-		ret = ret['embed_url']
 		return gifs['data'][0]['embed_url']
 
 	return ''
