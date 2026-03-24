@@ -47,7 +47,8 @@ def klipy_lookup(search_term, lmt = 1):
 	session = requests.Session()
 	req = session.get(
 						f"https://api.klipy.com/api/v1/{api_key}/gifs/search?q={search_term}&customer_id={customer_id}&per_page={lmt}&locale=en&content_filter=r", 
-						headers={'User-Agent': 'Mozilla/5.0'}
+						headers={'User-Agent': 'Mozilla/5.0'},
+						timeout=5
 					)
 
 	if req.status_code == 200:
@@ -73,7 +74,8 @@ def giphy_lookup(search_term, lmt = 1):
 	session = requests.Session()
 	req = session.get(
 						f"https://api.giphy.com/v1/gifs/search?api_key={api_key}&q={search_term}&random_id={customer_id}&limit={lmt}&lang=en&rating=r", 
-						headers={'User-Agent': 'Mozilla/5.0'}
+						headers={'User-Agent': 'Mozilla/5.0'},
+						timeout=5
 					)
 
 	if req.status_code == 200:

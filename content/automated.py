@@ -52,7 +52,8 @@ def tenor_tags(link):
         return 'Error fetching Tenor API'
     req = session.get(
                             url=f"https://tenor.googleapis.com/v2/posts?ids={match.group(0)}&key={API_KEY}&limit={1}media_filter=minimal", 
-                            headers={'User-Agent': 'Mozilla/5.0'}
+                            headers={'User-Agent': 'Mozilla/5.0'},
+                            timeout=5
                         )
     if req.status_code != 200:
         return None
@@ -73,24 +74,29 @@ def klipy_tags(slug):
         return 'Error fetching Klipy API'
     req = session.get(
                             url=f"https://api.klipy.com/api/v1/{KLIPY_API_KEY}/gifs/items?slugs={slug}", 
-                            headers={'User-Agent': 'Mozilla/5.0'}
+                            headers={'User-Agent': 'Mozilla/5.0'},
+                            timeout=5
                         )
     if req.status_code != 200:
         return None
     
-    response = json.loads(req.content)
-    if response['results'] is False or response['data'] is None or response['data']['data'] is None or response['data']['data'][0] is None:
-        return '[gif:]'
-    if len(response['data']['data'][0]['title']) > 0:
-        for tag in response['data']['data'][0]['title'].split():
-            return_phrase += f' {tag},'
-        return return_phrase[:-1] + ']'
-    elif len(response['data']['data'][0]['slug']) > 0:
-        for tag in response['data']['data'][0]['slug'].split('-'):
-            return_phrase += f' {tag},'
-        return return_phrase[:-1] + ']'
-    else:
-        return '[gif:]'
+    try:
+        response = json.loads(req.content)
+        if response.get('result', []) is False:
+            return '[gif:]'
+        if len(response['data']['data'][0]['title']) > 0:
+            for tag in response['data']['data'][0]['title'].split():
+                return_phrase += f' {tag},' if len(tag) > 2 else ''
+            return return_phrase[:-1] + ']'
+        elif len(response['data']['data'][0]['slug']) > 0:
+            for tag in response['data']['data'][0]['slug'].split('-'):
+                return_phrase += f' {tag},'
+            return return_phrase[:-1] + ']'
+        else:
+            return '[gif:]'
+    except Exception as e:
+        print(f"Error parsing giphy api response: {e}")
+        
 
 def giphy_tags(slug):
     return_phrase = "[gif:"
@@ -99,28 +105,32 @@ def giphy_tags(slug):
     if slug is None:
         return 'Error fetching Giphy API'
     req = session.get(
-                            url=f"api.giphy.com/v1/gifs/{slug}?api_key={GIPHY_API_KEY}&random_id=jockyptAPI", 
-                            headers={'User-Agent': 'Mozilla/5.0'}
-                        )
+                            url=f"https://api.giphy.com/v1/gifs/{slug}?api_key={GIPHY_API_KEY}&random_id=jockyptAPI", 
+                            headers={'User-Agent': 'Mozilla/5.0'},
+                            timeout=5
+                        ) # this fails for some reason without a status code at all, giphy api moment i guess
     if req.status_code != 200:
         return None
-    
-    response = json.loads(req.content)
-    if response['data'] is None or response['data']['title'] is None:
-        return '[gif:]'
-
-    response.replace('GIF', '')
-
-    if len(response['data']['title']) > 0:
-        for tag in response['data']['title'].split():
-            return_phrase += f' {tag},'
-        return return_phrase[:-1] + ']'
-    elif len(response['data']['data'][0]['slug']) > 0:
-        for tag in response['data']['data'][0]['slug'].split('-'):
-            return_phrase += f' {tag},'
-        return return_phrase[:-1] + ']'
-    else:
-        return '[gif:]'
+    try:
+        response = json.loads(req.content)
+        if response.get('data', []) is None or response['data'].get('title', '') is None:
+            return '[gif:]'
+        if match := re.findall(re.compile(r'(\b[^-[0-9]+\b)'), response['data']['slug']):
+            for word in match:
+                return_phrase += f' {word},' if len(word) > 2 else ''
+            return return_phrase[:-1] + ']'
+        elif len(response['data']['title']) > 0:
+            for tag in response['data']['title'].replace('GIF', '').split():
+                return_phrase += f' {tag},'
+            return return_phrase[:-1] + ']'
+        elif len(response['data']['data'][0]['slug']) > 0:
+            for tag in response['data']['data'][0]['slug'].split('-'):
+                return_phrase += f' {tag},'
+            return return_phrase[:-1] + ']'
+        else:
+            return '[gif:]'
+    except Exception as e:
+        print(f"Error parsing giphy api response: {e}")
 
 
 def format_json(entries = -1, use_multi_turn = True, additive_dataset = False, owner_messages_only = False):
@@ -366,9 +376,9 @@ def pattern_match(message, pings = None):
 
     tenor_pattern = re.compile(r"(.*)(tenor\.com\/)([^\s]*)(.*).gif(.*)", re.IGNORECASE)
 
-    klipy_pattern = re.compile(r"(.*)(klipy\.com\/gifs\/)([^\s]*)", re.IGNORECASE)
+    klipy_pattern = re.compile(r"(.*)(https:\/\/?klipy\.com\/gifs\/)([^\s]*)(.*)", re.IGNORECASE)
 
-    giphy_pattern = re.compile(r"(.*)(media.giphy.com\/media\/v1.)(.{100}\/)(.{18})\/giphy.gif(.*)", re.IGNORECASE)
+    giphy_pattern = re.compile(r"(.*)(https:\/\/media[0-9]?\.giphy\.com\/media\/v1\.)(.{100}(.{010})?\/)(.{18})\/giphy\.gif(.*)", re.IGNORECASE)
     
     message = dismoji.demojize(message)
 
@@ -404,10 +414,10 @@ def pattern_match(message, pings = None):
         match = giphy_pattern.search(message)
         if not match:
             break
-        message_replacement = giphy_tags(match.group(4))
+        message_replacement = giphy_tags(match.group(5))
         if message_replacement == 'None':
             return (message, "Message contains invalid giphy gif")
-        message = f"{match.group(1)}{message_replacement}{match.group(5)}"
+        message = f"{match.group(1)}{message_replacement}{match.group(6)}"
 
     while True:
         match = klipy_pattern.search(message)

@@ -47,6 +47,8 @@ def main():
 																use_cache=False,
 																#attn_implementation="flash_attention_2"
 															).to('cuda')
+
+	
 	
 	base_model.config.use_flash_attention = True
 	
@@ -69,6 +71,16 @@ def main():
 		print("Set padding token to:", tokenizer.pad_token)
 	else:
 		print("Default padding token set to:", tokenizer.pad_token)
+
+	new_tokens = ["[gif:"]
+
+	test_string = "[gif: malphite, meme, gif]"
+
+	print(f"Tokenizer special tokens pre-sanity check: {test_string} == {tokenizer.encode(test_string, add_special_tokens=False)}")
+
+	tokenizer.add_tokens(new_tokens)
+
+	print(f"Tokenizer special tokens post-sanity check: {test_string} == {tokenizer.encode(test_string, add_special_tokens=False)}")
 
 	max_seq_length = 128
 
@@ -114,11 +126,14 @@ def main():
 							bias="none",
 							lora_dropout= 0.05,
 							task_type="CAUSAL_LM",
+							modules_to_save=["embed_tokens", "lm_head"]
 						)
 
 	print(config.target_modules)
 	
 	print(tokenizer.chat_template)
+
+	base_model.resize_token_embeddings(len(tokenizer))
 
 	model = prepare_model_for_kbit_training(base_model, use_gradient_checkpointing=True)
 
@@ -130,7 +145,7 @@ def main():
 	weight_decay = 0.01 # 0.05 for checkpoint overfitting, 0.01 for training
 	batch_size = 1
 	max_steps = 1000
-	beta = 0.3
+	beta = 0.4
 
 	dataset_path = "./content/synth_orpo.json" # "./content/handmade_orpo.json" # 
 
@@ -159,7 +174,7 @@ def main():
 													max_grad_norm=0.3,
 													logging_steps=10,
 													eval_steps=10,
-													save_steps=10,
+													save_steps=30,
 													load_best_model_at_end=True,
 													gradient_accumulation_steps=4,
 													warmup_steps= 30,
@@ -188,7 +203,7 @@ def main():
 	
 	print("chosen logits:", trainer.eval_dataset[0])
 
-	trainer.train(resume_from_checkpoint=True , ignore_keys_for_eval=["optimizer", "scheduler"]) # False #
+	trainer.train(resume_from_checkpoint=False) # False # True, ignore_keys_for_eval=["optimizer", "scheduler"]
 
 	print("Finished training")
 
