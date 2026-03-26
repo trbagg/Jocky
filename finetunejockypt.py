@@ -18,7 +18,7 @@ from peft import LoraConfig, prepare_model_for_kbit_training
 from trl.experimental.orpo import ORPOConfig, ORPOTrainer
 
 
-model_name = "mistralai/Mistral-7B-Instruct-v0.3" # 
+model_name = "mistralai/Mistral-7B-Instruct-v0.3" # Qwen/Qwen3.5-4B # for image-text-to-text
 
 def main():
 
@@ -203,7 +203,7 @@ def main():
 	
 	print("chosen logits:", trainer.eval_dataset[0])
 
-	trainer.train(resume_from_checkpoint=False) # False # True, ignore_keys_for_eval=["optimizer", "scheduler"]
+	trainer.train(resume_from_checkpoint=True, ignore_keys_for_eval=["optimizer", "scheduler"]) # False # 
 
 	print("Finished training")
 

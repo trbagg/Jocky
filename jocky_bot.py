@@ -12,8 +12,8 @@ from jocky_pt import cleanup, inference, message_history, local_model_path
 from content.automated import usernames, ids, pattern_match
 
 discord_association = {key: value for key, value in zip(usernames,ids)}
-ping_pattern = re.compile(r"\[@[A-Za-z0-9_]+\]", re.IGNORECASE)
-gif_pattern = re.compile(r"\[gif:[A-Za-z0-9_ ,\-\(\)]+\]", re.IGNORECASE)
+ping_pattern = re.compile(r"(.*)(<@[A-Za-z0-9_>]+)(.*)", re.IGNORECASE)
+gif_pattern = re.compile(r"(.*)(\[[gif:[A-Za-z0-9_ ,\-\(\)]+\])(.*)", re.IGNORECASE)
 dataset_path = "content/ping_info.json"
 rolling_messages = {"length": 0, "messages": []}
 
@@ -109,16 +109,16 @@ def ping_match(ping, discord_association):
 def unsanitize(response):
 	match = True
 	while match:
-		match = ping_pattern.search(response.lower())
+		match = ping_pattern.match(response.lower())
 		if match:
-			response = response[:match.start()] + ping_match(response[match.start()+2:match.end()-1], discord_association) + response[match.end():]
+			response = response[:match.group(2).start()] + ping_match(response[match.group(2).start()+2:match.group(2).end()-1], discord_association) + response[match.group(2).end():]
 
 	match = True
 	while match:
-		match = gif_pattern.search(response)
+		match = gif_pattern.match(response)
 		if match:
-			gif_link = giphy_match(response[match.start()+5:match.end()-1])
-			response = f'{response[:match.start()]} {gif_link} {response[match.end():]}'
+			gif_link = giphy_match(response[match.group(2).start()+5:match.group(2).end()-1])
+			response = f'{response[:match.group(2).start()]} {gif_link} {response[match.group(2).end():]}'
 	
 	return response
 

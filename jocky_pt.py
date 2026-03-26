@@ -9,7 +9,7 @@ torch.cuda.empty_cache()
 import transformers
 from peft import PeftModel
 
-local_model_path = "./jockypt-ft/checkpoint-510"
+local_model_path = "./jockypt-ft/checkpoint-630" # ./jockypt-ft/checkpoint-510
 
 print("Loading models...")
 
@@ -38,9 +38,9 @@ base_model = transformers.AutoModelForCausalLM.from_pretrained(
 
 base_model.config.use_flash_attention = True
 
-eval_tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, 
+eval_tokenizer = transformers.AutoTokenizer.from_pretrained(local_model_path, 
 															cache_dir=cache_dir, 
-															add_bos_token=True,
+															add_bos_token=False,
 															add_eos_token=False,  
 															trust_remote_code=True)
 
@@ -53,7 +53,7 @@ test_string = "[gif: malphite, meme, gif]"
 print(f"Tokenizer special tokens pre-sanity check: {test_string} == {eval_tokenizer.encode(test_string, add_special_tokens=False)}")
 print()
 
-base_model.resize_token_embeddings(len(tokenizer))
+base_model.resize_token_embeddings(len(eval_tokenizer))
 
 peft_model = PeftModel.from_pretrained(
 										base_model, 

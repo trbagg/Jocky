@@ -47,11 +47,11 @@ def tenor_tags(link):
     return_phrase = "[gif:"
 
     session = requests.Session()
-    match = re.search(r'(\d{5,})(?!.*\d)', link)
+    match = re.match(r'(.*)(https:\/\/tenor.com\/view\/([^\s]+))(.*)', link)
     if match is None:
         return 'Error fetching Tenor API'
     req = session.get(
-                            url=f"https://tenor.googleapis.com/v2/posts?ids={match.group(0)}&key={API_KEY}&limit={1}media_filter=minimal", 
+                            url=f"https://tenor.googleapis.com/v2/posts?ids={match.group(3)}&key={API_KEY}&limit={1}media_filter=minimal", 
                             headers={'User-Agent': 'Mozilla/5.0'},
                             timeout=5
                         )
