@@ -9,7 +9,7 @@ torch.cuda.empty_cache()
 import transformers
 from peft import PeftModel
 
-local_model_path = "./jockypt-ft/checkpoint-630" # ./jockypt-ft/checkpoint-510
+local_model_path = "./jockypt-ft/checkpoint-210" # ./jockypt-ft/checkpoint-510
 
 print("Loading models...")
 
@@ -21,28 +21,29 @@ with open(sys_instruct_path, 'r') as f:
 
 bnb_config = transformers.BitsAndBytesConfig(
 												load_in_4bit=True,
-												bnb_4bit_use_double_quant=True,
 												bnb_4bit_quant_type="nf4",
+												bnb_4bit_use_double_quant=True,
 												bnb_4bit_compute_dtype=torch.bfloat16
 											)
 
-base_model = transformers.AutoModelForCausalLM.from_pretrained(
+base_model = transformers.AutoModelForImageTextToText.from_pretrained(
 	model_name,
 	cache_dir=cache_dir, 
 	quantization_config=bnb_config,
 	dtype=torch.bfloat16,
 	device_map="auto",
 	trust_remote_code=True,
-	#attn_implementation="flash_attention_2"
+	attn_implementation="sdpa",
 )
 
-base_model.config.use_flash_attention = True
-
-eval_tokenizer = transformers.AutoTokenizer.from_pretrained(local_model_path, 
-															cache_dir=cache_dir, 
-															add_bos_token=False,
-															add_eos_token=False,  
-															trust_remote_code=True)
+processor = transformers.AutoProcessor.from_pretrained(
+                                                                "./jockypt-ft/processor",
+																local_files_only=True,
+                                                                add_bos_token=True,
+                                                                add_eos_token=False, 
+                                                            )
+    
+eval_tokenizer = processor.tokenizer
 
 test_text = "[gif: ;) :) \\_/ :3"
 tokens = eval_tokenizer.encode(test_text)
@@ -50,7 +51,7 @@ decoded = eval_tokenizer.decode(tokens)
 print(f"Original: {test_text}")
 print(f"Decoded: {decoded}")
 test_string = "[gif: malphite, meme, gif]"
-print(f"Tokenizer special tokens pre-sanity check: {test_string} == {eval_tokenizer.encode(test_string, add_special_tokens=False)}")
+print(f"Tokenizer special tokens pre-sanity check: {test_string[:5]} == {eval_tokenizer.encode(test_string[:5], add_special_tokens=False)} && {test_string} == {eval_tokenizer.encode(test_string, add_special_tokens=False)}")
 print()
 
 base_model.resize_token_embeddings(len(eval_tokenizer))
@@ -64,43 +65,56 @@ peft_model = PeftModel.from_pretrained(
 
 
 
-def inference(message, history, no_bot = False, member = 'Yogipanda', temperature = None):
+def inference(message, history, url = None, image = None, no_bot = False, member = 'Yogipanda', temperature = None):
 	print(f"Infering {member}'s message: {message}")
 	try:
 		if no_bot:
 			message = input("User: ")
-		prompt_input = eval_tokenizer.apply_chat_template(
-															#[{"role": "system", "content": f"{sys_instruct}"}] + # mistral does not support sys prompts explicitly, must be trained on it
-															[{"role": entry['role'], "content": entry['content']} for entry in history] + #
-															[{"role": "user", "content": message}],
-															tokenize=False,
+		
+		content = []
+		if url:
+			content.append({"type": "image", "url": url})
+		if image:
+			content.append({"type": "image", "image": image})
+		
+		content.append({"type": "text", "text": message})
+		
+		prompt_inputs = processor.apply_chat_template(
+															#[{"role": "system", "content": f"{sys_instruct}"}] + 
+															[{"role": entry['role'], "content": [{"type": "text", "text": entry['content']}]} for entry in history] + #
+															[{"role": "user", "content": content
+															}],
+															tokenize=True,
 															add_generation_prompt=True,
 															add_special_tokens=False,
-														)
-		inputs = eval_tokenizer(prompt_input, return_tensors='pt').to('cuda')
-
-		input_ids = inputs["input_ids"].to('cuda')
+															return_dict=True,
+															return_tensors="pt",
+														).to('cuda')
 		
 		peft_model.eval()
 
 		
 		with torch.no_grad():
 			output = base_model.generate(
-											input_ids, 
-											attention_mask=inputs["attention_mask"].to('cuda'), 
-											eos_token_id=eval_tokenizer.eos_token_id,
-											pad_token_id=eval_tokenizer.pad_token_id,
+											**prompt_inputs, 
 											max_new_tokens=128, # 512
-											no_repeat_ngram_size=3,
 											temperature= 0.7 if temperature is None else temperature, # Note: initial temp is set in jocky_bot.py when calling inference()
 											repetition_penalty=1.2,
-											top_p=0.85,
-											top_k=30,
+											top_p=0.8,
+											top_k=20,
 											do_sample=True,
 										)
 			
-			print(output)
-			generated_text = eval_tokenizer.batch_decode([output[0][input_ids.shape[1]:]], skip_special_tokens=True)
+			trimmed = [
+				out[len(in_ids):]
+				for in_ids, out in zip(prompt_inputs["input_ids"], output)
+			]
+
+			generated_text = processor.batch_decode(
+														trimmed,
+														skip_special_tokens=True,
+														clean_up_tokenization_spaces=False
+													)
 
 		return generated_text[0]
 
@@ -127,7 +141,7 @@ def message_history(history, user, msg, context_length = 8192, max_messages = 16
 		history['length'] = len(eval_tokenizer.tokenize(tokenize_history(history=history['messages'])))
 
 def tokenize_history(history):
-	return eval_tokenizer.apply_chat_template(
+	return processor.apply_chat_template(
 												history,
 												tokenize=False,
 												add_generation_prompt=True,
